@@ -31,10 +31,8 @@ bootupd8r creates a fallback mechanism on UEFI for installing new boot loaders.
 
 %install
 install -m 0755 -d %{buildroot}%{_prefix}/lib/bootloader
-install -m 0755 -t %{buildroot}%{_prefix}/lib/bootloader install_bootloader
 install -m 0755 -d %{buildroot}%{_sbindir}
-install -m 0755 -t %{buildroot}%{_sbindir} create_boot_path
-install -m 0755 -t %{buildroot}%{_sbindir} set_boot_entry
+install -m 0755 -t %{buildroot}%{_sbindir} bootupd8r
 install -m 0755 -d %{buildroot}%{_unitdir}
 install -m 0644 -t %{buildroot}%{_unitdir} bootupd8r.service
 install -m 0755 -d %{buildroot}%{_presetdir}
@@ -43,9 +41,7 @@ install -m 0644 -t %{buildroot}%{_presetdir} 91-bootupd8r.preset
 %files
 %defattr(-,root,root,-)
 %dir %{_prefix}/lib/bootloader
-%{_prefix}/lib/bootloader/install_bootloader
-%{_sbindir}/set_boot_entry
-%{_sbindir}/create_boot_path
+%{_sbindir}/bootupd8r
 %{_unitdir}/bootupd8r.service
 %{_presetdir}/91-bootupd8r.preset
 
@@ -60,7 +56,7 @@ install -m 0644 -t %{buildroot}%{_presetdir} 91-bootupd8r.preset
 rm -rf /boot/efi/EFI_NEW/
 
 %posttrans
-. %{_sbindir}/create_boot_path
+. %{_sbindir}/bootupd8r create_boot_path
 
 %changelog
 * Mon Dec 15 2025 Marta Lewandowska <mlewando@redhat.com> - 1-8

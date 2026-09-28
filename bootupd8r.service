@@ -5,7 +5,7 @@ Wants=boot-complete.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash /usr/sbin/set_boot_entry
+ExecStart=/bin/bash /usr/sbin/bootupd8r set_boot_entry
 ExecStartPost=/usr/bin/rm -f /var/lib/bootupd8r-pending
 
 [Install]

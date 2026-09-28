@@ -24,9 +24,7 @@ archive: bootupd8r-$(VERSION).tar.xz
 
 bootupd8r-$(VERSION).tar.xz :
 	@git archive --format=tar --prefix=bootupd8r-$(VERSION)/ HEAD -- \
-		create_boot_path \
-		install_bootloader \
-		set_boot_entry \
+		bootupd8r \
 		bootupd8r.service \
 		91-bootupd8r.preset \
 	| xz > $@

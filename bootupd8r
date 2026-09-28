@@ -1,0 +1,210 @@
+#!/usr/bin/bash
+
+set_boot_entry() {
+    if [[ ! -d /sys/firmware/efi/ ]]; then
+        exit 0
+    fi
+
+    ESP_DIR_A=/boot/efi/EFI
+    ESP_DIR_B=/boot/efi/EFI_NEW
+
+    if [[ -f /usr/lib/bootloader/bl.cfg ]]; then
+        . /usr/lib/bootloader/bl.cfg
+    fi
+
+    ENTRY=$(efibootmgr | grep BootCurrent | cut -d':' -f2)
+    efibootmgr | grep ${ENTRY} | grep -q "${NAME}_new"
+    result=$(echo $?)
+
+    if [[ $result -eq 0 ]]; then
+        FROM_DIR=${ESP_DIR_B}
+        TO_DIR=${ESP_DIR_A}
+    else
+        FROM_DIR=${ESP_DIR_A}
+        TO_DIR=${ESP_DIR_B}
+        # need to warn user that new entry failed to boot
+        echo "[$(date '+%H:%M:%S  %d-%m-%Y')] New entry ${ENTRY} failed to boot; this system is in an unstable state." \
+            | tee -a /var/log/bootupdate.log >&2
+        exit 1
+    fi
+
+    cp -R -f -Z ${FROM_DIR}/* ${TO_DIR}/. || :
+}
+
+install_bootloader() {
+    if [[ ! -d /sys/firmware/efi/ ]]; then
+        exit 0
+    fi
+
+    if [[ $# < 2 ]]; then
+        exit 0
+    fi
+
+    . /etc/os-release
+    DISTRO=$(echo ${ID} | sed -e 's/rhel/redhat/' -e 's/\"//')
+
+    FROM_DIR=${1}
+    EFI_DIR=${2}
+
+    if [[ -f /usr/lib/bootloader/bl.cfg ]]; then
+        . /usr/lib/bootloader/bl.cfg
+    fi
+
+    if [[ -d ${EFI_DIR} ]]; then
+        efibootmgr | grep BootNext
+        status=$(echo $?)
+        if [[ $status -eq 1 ]]; then
+            NEW_BOOT_ENTRY=$(efibootmgr | grep "${NAME}_new" | cut -d'*' -f1)
+            if [[ -z ${NEW_BOOT_ENTRY} ]]; then
+                bootupd8r create_boot_path
+                NEW_BOOT_ENTRY=$(efibootmgr | grep "${NAME}_new" | cut -d'*' -f1)
+            fi
+            NEW_BOOT_ENTRY=$(echo $NEW_BOOT_ENTRY | sed 's/Boot//')
+            efibootmgr -n $NEW_BOOT_ENTRY
+            touch /var/lib/bootupd8r-pending
+        fi
+    fi
+
+    cp -R -f -Z ${FROM_DIR}/* ${EFI_DIR}/. || :
+}
+
+parse_string() {
+    for i in "$@"; do
+        if [[ $1 == "-L" ]]; then
+            shift
+            NAME=${1}
+        elif [[ $1 == "-d" ]]; then
+            shift
+            DEVICE=${1}
+        elif [[ $1 == "-p" ]]; then
+            shift
+            PARTITION=${1}
+        elif [[ $1 == "-l" ]]; then
+            shift
+            EFI_PATH=${1}
+        else
+            shift
+        fi
+    done
+}
+
+create_boot_path() {
+    if [[ ! -d /sys/firmware/efi/ ]]; then
+        exit 0
+    fi
+
+    . /etc/os-release
+    DISTRO=$(echo ${ID} | sed -e 's/rhel/redhat/' -e 's/\"//')
+
+    ARCH=$(uname -m)
+    AR=x64
+    if [[ ${ARCH} == aarch64 ]]; then
+        AR=aa64
+    fi
+
+    ESP_DIR_A=/boot/efi/EFI
+    ESP_DIR_B=/boot/efi/EFI_NEW
+
+    # default settings
+    NAME=${DISTRO}
+    EFI_DEV=$(lsblk -l | grep efi | cut -d' ' -f1)
+    PARTITION=$(echo ${EFI_DEV} | rev | grep -o "^[0-9]*" | rev)
+    DEVICE=$(lsblk -l | grep -B1 efi | grep disk | cut -d' ' -f1)
+    DEVICE="/dev/${DEVICE}"
+    EFI_PATH="\EFI\${DISTRO}\shim${AR}.efi"
+
+    if [[ ! -d ${ESP_DIR_B} ]]; then
+        # create directory for new entry and copy binaries there
+        mkdir -p ${ESP_DIR_B}
+        cp -R -f -Z ${ESP_DIR_A}/* ${ESP_DIR_B}/.
+
+        INSTALL_LOG=/var/log/anaconda/storage.log
+        if [[ -f /usr/lib/bootloader/bl.cfg ]]; then
+            . /usr/lib/bootloader/bl.cfg
+        elif [[ -f ${INSTALL_LOG} ]]; then
+            EFI_ENTRY=$(grep "efibootmgr " ${INSTALL_LOG} | cut -d' ' -f5-)
+            parse_string ${EFI_ENTRY}
+        fi
+
+        if ! echo $EFI_PATH | grep 'EFI_NEW'; then
+            EFI_PATH=$(echo ${EFI_PATH} | sed -e 's/EFI/EFI_NEW/')
+        fi
+
+        # create entry for new EFI_PATH
+        NEW_NAME=${NAME}_new
+        efibootmgr | grep -q $NEW_NAME
+        if [[ $? -eq 0 ]]; then
+            old_entry=$(efibootmgr | grep ${NEW_NAME} | cut -d' ' -f1)
+            old_entry=$(echo ${old_entry} | sed 's/Boot//' | sed 's/*//')
+            efibootmgr -B -b ${old_entry}
+        fi
+
+        if [[ -n ${CMDLINE} ]]; then
+            # TODO
+            echo -n "\nmbl-cloud.uki $(echo ${CMDLINE}) boot=$(awk '/ \/boot / {print $1}' /etc/fstab) rd.system.gpt_auto=0" | iconv -f UTF8 -t UCS-2LE | efibootmgr -C -d ${DEVICE} -p ${PARTITION} -L ${NEW_NAME} -l /EFI_NEW/${DISTRO}/shim${AR}.efi -@ -
+        else
+            efibootmgr -C -w -L ${NEW_NAME} -d ${DEVICE} -p ${PARTITION} -l ${EFI_PATH}
+        fi
+
+        if [[ ! -f /usr/lib/bootloader/bl.cfg ]]; then
+            cat > /usr/lib/bootloader/bl.cfg << EOF
+NAME=${NAME}
+DEVICE=${DEVICE}
+PARTITION=${PARTITION}
+EFI_PATH=${EFI_PATH}
+EOF
+if [[ -n ${CMDLINE} ]]; then
+    cat >> /usr/lib/bootloader/bl.cfg << EOF
+CMDLINE=${CMDLINE}
+EOF
+fi
+        fi
+
+    fi
+}
+
+help() {
+    cat << EOF
+Usage: $(basename "$0") <command>
+
+Commands:
+  create_boot_path      Create boot etry for EFI_NEW
+  install_bootloader    Install boot loader to the folder EFI_NEW
+  set_boot_entry        Verify if the bootCurrent is EFI_NEW and if it is promote it to be the default boot
+  help
+
+EOF
+}
+
+main () {
+    if [[ $# -eq 0 ]]; then
+        help
+        exit 1
+    fi
+
+    local subcommand="$1"
+    shift
+
+    case "$subcommand" in
+        create_boot_path)
+            create_boot_path "$@"
+            ;;
+        install_bootloader)
+            install_bootloader "$@"
+            ;;
+        set_boot_entry)
+            set_boot_entry
+            ;;
+        help)
+            help
+            exit 0
+            ;;
+        *)
+            echo "Error: $subcommand is not a valid command." >&2
+            help
+            exit 0
+            ;;
+    esac
+}
+
+main "$@"
