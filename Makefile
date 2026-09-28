@@ -27,8 +27,8 @@ bootupd8r-$(VERSION).tar.xz :
 		create_boot_path \
 		install_bootloader \
 		set_boot_entry \
-		AB-boot.service \
-		91-AB-boot.preset \
+		bootupd8r.service \
+		91-bootupd8r.preset \
 	| xz > $@
 
 bootupd8r-$(VR).src.rpm : bootupd8r.spec bootupd8r-$(VERSION).tar.xz

@@ -1,12 +1,12 @@
 [Unit]
 Description=Setting good boot entry
-ConditionPathExists=/var/lib/grub-migration-pending
+ConditionPathExists=/var/lib/bootupd8r-pending
 Wants=boot-complete.target
 
 [Service]
 Type=oneshot
 ExecStart=/bin/bash /usr/sbin/set_boot_entry
-ExecStartPost=/usr/bin/rm -f /var/lib/grub-migration-pending
+ExecStartPost=/usr/bin/rm -f /var/lib/bootupd8r-pending
 
 [Install]
 WantedBy=multi-user.target

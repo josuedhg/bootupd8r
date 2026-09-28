@@ -36,9 +36,9 @@ install -m 0755 -d %{buildroot}%{_sbindir}
 install -m 0755 -t %{buildroot}%{_sbindir} create_boot_path
 install -m 0755 -t %{buildroot}%{_sbindir} set_boot_entry
 install -m 0755 -d %{buildroot}%{_unitdir}
-install -m 0644 -t %{buildroot}%{_unitdir} AB-boot.service
+install -m 0644 -t %{buildroot}%{_unitdir} bootupd8r.service
 install -m 0755 -d %{buildroot}%{_presetdir}
-install -m 0644 -t %{buildroot}%{_presetdir} 91-AB-boot.preset
+install -m 0644 -t %{buildroot}%{_presetdir} 91-bootupd8r.preset
 
 %files
 %defattr(-,root,root,-)
@@ -46,17 +46,17 @@ install -m 0644 -t %{buildroot}%{_presetdir} 91-AB-boot.preset
 %{_prefix}/lib/bootloader/install_bootloader
 %{_sbindir}/set_boot_entry
 %{_sbindir}/create_boot_path
-%{_unitdir}/AB-boot.service
-%{_presetdir}/91-AB-boot.preset
+%{_unitdir}/bootupd8r.service
+%{_presetdir}/91-bootupd8r.preset
 
 %post
-%systemd_post AB-boot.service
+%systemd_post bootupd8r.service
 
 %preun
-%systemd_preun AB-boot.service
+%systemd_preun bootupd8r.service
 
 %postun
-%systemd_postun AB-boot.service
+%systemd_postun bootupd8r.service
 rm -rf /boot/efi/EFI_NEW/
 
 %posttrans

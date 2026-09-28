@@ -29,7 +29,7 @@ if [[ -d ${EFI_DIR} ]]; then
         fi 
         NEW_BOOT_ENTRY=$(echo $NEW_BOOT_ENTRY | sed 's/Boot//')
         efibootmgr -n $NEW_BOOT_ENTRY
-        touch /var/lib/grub-migration-pending
+        touch /var/lib/bootupd8r-pending
     fi
 fi
 
