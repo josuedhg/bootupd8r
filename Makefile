@@ -39,4 +39,6 @@ bootupd8r-$(VR).noarch.rpm : bootupd8r-$(VR).src.rpm
 clean :
 	@rm -vf bootupd8r-$(VERSION).tar.xz
 
+include tests/Makefile.tests.mk
+
 .PHONY: all install clean archive
