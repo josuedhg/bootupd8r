@@ -107,11 +107,11 @@ create_boot_path() {
 
     # default settings
     NAME=${DISTRO}
-    EFI_DEV=$(lsblk -l | grep efi | cut -d' ' -f1)
-    PARTITION=$(echo ${EFI_DEV} | rev | grep -o "^[0-9]*" | rev)
-    DEVICE=$(lsblk -l | grep -B1 efi | grep disk | cut -d' ' -f1)
+    EFI_DEV=$(lsblk -no NAME --filter "PARTTYPE == 'c12a7328-f81f-11d2-ba4b-00a0c93ec93b'")
+    PARTITION=$(lsblk -no PARTN --filter "PARTTYPE == 'c12a7328-f81f-11d2-ba4b-00a0c93ec93b'")
+    DEVICE=$(lsblk -no PKNAME --filter "PARTTYPE == 'c12a7328-f81f-11d2-ba4b-00a0c93ec93b'")
     DEVICE="/dev/${DEVICE}"
-    EFI_PATH="\EFI\${DISTRO}\shim${AR}.efi"
+    EFI_PATH="\EFI\\${DISTRO}\shim${AR}.efi"
 
     if [[ ! -d ${ESP_DIR_B} ]]; then
         # create directory for new entry and copy binaries there
