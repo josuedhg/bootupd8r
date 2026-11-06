@@ -1,0 +1,68 @@
+name: Bootupd8r Tests
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  test-bootupd8r:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_URL: "https://download.fedoraproject.org/pub/fedora/linux/releases/44/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-44-1.7.x86_64.qcow2"
+      CACHE_DIR: "/tmp/cache"
+      LIBGUESTFS_BACKEND: "direct"
+      LIBGUESTFS_PATH: "/tmp/cache/fixed-appliance"
+      ROOT_PASSWORD: "12345"
+      TEST_IMAGE: "/tmp/cache/test.qcow2"
+      OVMF_CODE_PATH: "/usr/share/OVMF/OVMF_CODE_4M.fd"
+      OVMF_VARS_TEMPLATE_PATH: "/usr/share/OVMF/OVMF_VARS_4M.fd"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install needed packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            qemu-system-x86 \
+            qemu-utils \
+            ovmf \
+            libguestfs-tools \
+            tesseract-ocr \
+            socat
+
+      - name: Set cache for test image
+        id: image-cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.CACHE_DIR }}
+          key: image-test-cache
+
+      - name: Setup test image
+        if: steps.image-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get remove -y passt
+          sudo chmod 655 /boot/vmlinuz-*
+          sudo usermod -aG kvm $USER
+          newgrp kvm
+
+          mkdir -p $CACHE_DIR
+
+          wget -q https://download.libguestfs.org/binaries/appliance/appliance-1.58.1.tar.xz
+          mkdir -p $LIBGUESTFS_PATH
+
+          tar -xJf appliance-1.58.1.tar.xz -C $LIBGUESTFS_PATH --strip-components=1
+
+          curl -L $IMAGE_URL -o $TEST_IMAGE
+          virt-customize -a $TEST_IMAGE --root-password password:$ROOT_PASSWORD
+
+      - name: Running tests for bootupd8r
+        run: |
+          if [ "${{ runner.debug }}" = "1" ]; then
+            export DEBUG="-v"
+          fi
+          make -f tests/Makefile.tests.mk test
